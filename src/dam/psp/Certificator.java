@@ -27,11 +27,19 @@ public class Certificator implements Runnable {
 	DataInputStream in;
 
 	public Certificator(Socket s) {
-		this.sCliente = s;
+		
 		try {
+			this.sCliente = s;
 			in = new DataInputStream(s.getInputStream());
 		} catch (IOException e) {
 			e.printStackTrace();
+		} finally {
+			if (sCliente != null)
+				try {
+					sCliente.close();
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
 		}
 	}
 
@@ -53,14 +61,21 @@ public class Certificator implements Runnable {
 				break;
 			}
 			default:
-				sendAnswer("ERROR:'" + command + "' no se reconoce como una petición válida");
+				sendError("ERROR:'" + command + "' no se reconoce como una petición válida");
 			}
 		} catch (SocketTimeoutException e) {
-			sendAnswer("ERROR:Read timed out");
+			sendError("ERROR:Read timed out");
 		} catch (EOFException e) {
-			sendAnswer("ERROR:Se esperaba una petición");
+			sendError("ERROR:Se esperaba una petición");
 		} catch (IOException e) {
 			e.printStackTrace();
+		} finally {
+			try {
+				sCliente.close();
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
 
 	}
@@ -75,11 +90,11 @@ public class Certificator implements Runnable {
 				String cadena = Base64.getEncoder().encodeToString(md.digest(bytes));
 				sendAnswer("OK:" + cadena);
 			} else
-				sendAnswer("ERROR:Se esperaban datos");
+				sendError("ERROR:Se esperaban datos");
 		} catch (SocketTimeoutException e) {
-			sendAnswer("ERROR:Read timed out");
+			sendError("ERROR:Read timed out");
 		} catch (EOFException e) {
-			sendAnswer("ERROR:Se esperaba un algoritmo");
+			sendError("ERROR:Se esperaba un algoritmo");
 		} catch (IOException | NoSuchAlgorithmException e) {
 			e.printStackTrace();
 		}
@@ -102,16 +117,16 @@ public class Certificator implements Runnable {
 				sendAnswer("OK:" + cadena);
 			} catch (CertificateException e) {
 			} catch (IllegalArgumentException e) {
-				sendAnswer("ERROR:Se esperaba Base64");
+				sendError("ERROR:Se esperaba Base64");
 			} catch (EOFException e) {
-				sendAnswer("ERROR:Se esperaba un certificado");
+				sendError("ERROR:Se esperaba un certificado");
 			} catch (SocketTimeoutException e) {
-				sendAnswer("ERROR:Read timed out");
+				sendError("ERROR:Read timed out");
 			}
 		} catch (EOFException e) {
-			sendAnswer("ERROR:Se esperaba un alias");
+			sendError("ERROR:Se esperaba un alias");
 		} catch (SocketTimeoutException e) {
-			sendAnswer("ERROR:Read timed out");
+			sendError("ERROR:Read timed out");
 		} catch (IOException e) {
 		} catch (KeyStoreException e) {
 		} catch (NoSuchAlgorithmException e) {
@@ -143,11 +158,11 @@ public class Certificator implements Runnable {
 				}
 			}
 		} catch (SocketTimeoutException e) { // No entiendo porque no entra aqui, la verdad
-			sendAnswer("ERROR:Read timed out");
+			sendError("ERROR:Read timed out");
 		} catch (NoSuchAlgorithmException e) {
 			e.printStackTrace();
 		} catch (EOFException e) {
-			sendAnswer("ERROR:Se esperaba un alias");
+			sendError("ERROR:Se esperaba un alias");
 		} catch (IOException e) {
 			e.printStackTrace();
 		} catch (KeyStoreException e) {
@@ -155,7 +170,7 @@ public class Certificator implements Runnable {
 		} catch (NoSuchPaddingException e) {
 			e.printStackTrace();
 		} catch (InvalidKeyException e) {
-			sendAnswer("ERROR:'" + alias + "' no contiene una clave RSA");
+			sendError("ERROR:'" + alias + "' no contiene una clave RSA");
 		} catch (IllegalBlockSizeException e) {
 			e.printStackTrace();
 		} catch (BadPaddingException e) {
@@ -167,6 +182,22 @@ public class Certificator implements Runnable {
 	private void sendAnswer(String command) {
 		try {
 			new DataOutputStream(sCliente.getOutputStream()).writeUTF(command);
+		} catch (SocketTimeoutException e) {
+			try {
+				new DataOutputStream(sCliente.getOutputStream()).writeUTF("ERROR:Read timed out");
+			} catch (IOException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private void sendError(String command) {
+		try {
+			new DataOutputStream(sCliente.getOutputStream()).writeUTF(command);
+			sCliente.close();
 		} catch (SocketTimeoutException e) {
 			try {
 				new DataOutputStream(sCliente.getOutputStream()).writeUTF("ERROR:Read timed out");
